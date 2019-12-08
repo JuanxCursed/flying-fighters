@@ -2,10 +2,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Pawn.h"
+#include "GameFramework/Character.h"
 #include "FlyingFightersPawn.generated.h"
 
-UCLASS()
+UCLASS(Blueprintable)
 class FLYINGFIGHTERS_API AFlyingFightersPawn : public APawn
 {
 	GENERATED_BODY()
@@ -20,6 +20,32 @@ class FLYINGFIGHTERS_API AFlyingFightersPawn : public APawn
 	class USpringArmComponent* CameraBoomComponent;
 
 private:
+	float CurrentForwardSpeed;
+	
+	float CurrentHeight;
+	
+	/* Flag to control firing  */
+	uint32 bCanFire : 1;
+
+	/** Handle for efficient management of ShotTimerExpired timer */
+	FTimerHandle TimerHandle_ShotTimerExpired;
+
+protected:	
+	void AccelerateInput(float Value);
+	
+	void TurnUpInput(float Value);
+	
+	void FireInput();
+
+	void BombInput();
+
+	void SpecialInput();
+
+	void ShotTimerExpired();
+
+	static const FName FireRightBinding;
+
+public:	
 	UPROPERTY(EditAnywhere, Category = Plane)
 	float Acceleration;
 
@@ -36,21 +62,12 @@ private:
 	UPROPERTY(EditAnywhere, Category = Yaw)
 	float MinSpeed;
 
-	float CurrentForwardSpeed;
-	float CurrentHeight;
+	UPROPERTY(EditAnywhere, Category = Gameplay)
+	float FireRate;
 
-protected:	
-	void AccelerateInput(float Val);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Audio)
+	class USoundBase* FireSound;
 	
-	void TurnUpInput(float Val);
-	
-	void FireInput();
-
-	void BombInput();
-
-	void SpecialInput();
-
-public:	
 	// Sets default values for this pawn's properties
 	AFlyingFightersPawn();
 

@@ -1,20 +1,35 @@
 // Copyright 2010-2019 Married Games. All Rights Reserved.
 
 #include "FlyingFighters/Public/FlyingFightersPawn.h"
-//#include "FlyingFightersPawn.h"
+#include "FlyingFighters/Public/FlyingFightersDefaultProjectile.h"
+#include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/InputComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/CollisionProfile.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
+
+const FName AFlyingFightersPawn::FireRightBinding("FireRight");
 
 // Sets default values
 AFlyingFightersPawn::AFlyingFightersPawn()
 {
  	PrimaryActorTick.bCanEverTick = true;
 
+//	static ConstructorHelpers::FObjectFinder<UStaticMesh> ShipMesh(TEXT("/Game/TwinStick/Meshes/TwinStickUFO.TwinStickUFO"));
+
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
-	MeshComponent->SetupAttachment(RootComponent);
+	RootComponent = MeshComponent;
 	MeshComponent->RelativeScale3D = FVector(0.37f, 0.37f, 0.37f);
+	MeshComponent->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
+	//ShipMeshComponent->SetStaticMesh(ShipMesh.Object);
+
+	//static ConstructorHelpers::FObjectFinder<USoundBase> FireAudio(TEXT("/Game/TwinStick/Audio/TwinStickFire.TwinStickFire"));
+	//FireSound = FireAudio.Object;
 
 	// Create a camera boom attached to the root (capsule)
 	CameraBoomComponent = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoomComponent"));
@@ -51,10 +66,10 @@ void AFlyingFightersPawn::SetupPlayerInputComponent(UInputComponent* PlayerInput
 	check(PlayerInputComponent); // check if is not null
 
 	PlayerInputComponent->BindAxis("TurnUp", this, &AFlyingFightersPawn::TurnUpInput);
-	PlayerInputComponent->BindAxis("TurnDown", this, &AFlyingFightersPawn::TurnDownInput);
 	PlayerInputComponent->BindAxis("Accelerate", this, &AFlyingFightersPawn::AccelerateInput);
-	PlayerInputComponent->BindAxis("Deccelerate", this, &AFlyingFightersPawn::DeccelerateInput);
-
+	//PlayerInputComponent->BindAction("Fire", this, &AFlyingFightersPawn::FireInput);
+	//PlayerInputComponent->BindAction("Bomb", this, &AFlyingFightersPawn::BombInput);
+	//PlayerInputComponent->BindAction("Special", this, &AFlyingFightersPawn::SpecialInput);
 }
 
 void AFlyingFightersPawn::Tick(float DeltaSeconds){
@@ -71,25 +86,43 @@ void AFlyingFightersPawn::NotifyHit(class UPrimitiveComponent* MyComp, class AAc
 	// TODO: set game over here when ship is crashed
 }
 
-void AFlyingFightersPawn::AccelerateInput(float Val){
-	bool bHasInput = !FMath::IsNearlyEqual(Val, 0.f);
+void AFlyingFightersPawn::AccelerateInput(float Value){
+	bool bHasInput = !FMath::IsNearlyEqual(Value, 0.f);
 
-	float CurrentAcceleration = bHasInput ? (Val * Acceleration) : (-0.5f * Acceleration);
+	float CurrentAcceleration = bHasInput ? (Value * Acceleration) : (-0.5f * Acceleration);
 
 	float NewForwardSpeed = CurrentForwardSpeed + (GetWorld()->GetDeltaSeconds() * CurrentAcceleration);
 	CurrentForwardSpeed = FMath::Clamp(NewForwardSpeed, DefaultSpeed, MaxSpeed);	
+	AddMovementInput(GetActorRightVector() * CurrentForwardSpeed);
 }
 
-void AFlyingFightersPawn::TurnUpInput(float Val){
-	float TargetHeight = (Val * TurnSpeed);
+void AFlyingFightersPawn::TurnUpInput(float Value){
+	float TargetHeight = (Value * TurnSpeed);
 	TargetHeight += (FMath::Abs(CurrentHeight) * -0.2f);	
 	FVector CurrentLocation = GetActorLocation();
 	CurrentHeight = CurrentLocation.Z;
 	CurrentLocation.Z += FMath::FInterpTo(CurrentHeight, TargetHeight, GetWorld()->GetDeltaSeconds(), 2.f);			
 	SetActorLocation(CurrentLocation);
 	//TODO: make mesh component rotate on X axis by 16 degrees while is turning
+
 }
 
-void AFlyingFightersPawn::FireInput(){}
+void AFlyingFightersPawn::FireInput(){
+	if (bCanFire == true){
+		UWorld* const World = GetWorld();
+		if (World != nullptr){
+			World->SpawnActor<AFlyingFightersDefaultProjectile>(GetActorLocation(), FVector::ZeroVector);
+		}
+
+		bCanFire = false;
+		World->GetTimerManager().SetTimer(TimerHandle_ShotTimerExpired, this, &AFlyingFightersPawn::ShotTimerExpired, FireRate);
+
+		if(FireSound != nullptr){
+			UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
+		}
+
+		bCanFire = false;
+	}
+}
 void AFlyingFightersPawn::BombInput(){}
 void AFlyingFightersPawn::SpecialInput(){}
