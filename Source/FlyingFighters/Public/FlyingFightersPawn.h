@@ -39,13 +39,14 @@ protected:
 
 	void BombInput();
 
-	void SpecialInput();
-
-	void ShotTimerExpired();
+	void SpecialInput();	
 
 	static const FName FireRightBinding;
 
 public:	
+	AFlyingFightersPawn();
+
+
 	UPROPERTY(EditAnywhere, Category = Plane)
 	float Acceleration;
 
@@ -62,14 +63,17 @@ public:
 	UPROPERTY(EditAnywhere, Category = Yaw)
 	float MinSpeed;
 
+	/** Offset from the ships location to spawn projectiles */
+	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite )
+	FVector GunOffset;
+	
+	/* How fast the weapon will fire */
 	UPROPERTY(EditAnywhere, Category = Gameplay)
 	float FireRate;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Audio)
 	class USoundBase* FireSound;
 	
-	// Sets default values for this pawn's properties
-	AFlyingFightersPawn();
 
 	/*** APawn interface ***/
 	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
@@ -79,6 +83,9 @@ public:
 	
 	/*** AActor interface ***/
 	virtual void NotifyHit(class UPrimitiveComponent* MyComp, class AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit) override;
+
+	/* Handler for the fire timer expiry */
+	void ShotTimerExpired();
 
 	FORCEINLINE class UStaticMeshComponent* GetMeshComponent() const { return MeshComponent; }
 
