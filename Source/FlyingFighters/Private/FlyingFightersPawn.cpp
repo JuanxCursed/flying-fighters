@@ -40,7 +40,7 @@ AFlyingFightersPawn::AFlyingFightersPawn()
 	CameraBoomComponent->SetupAttachment(RootComponent);
 	CameraBoomComponent->bAbsoluteRotation = true; // Rotation of the character should not affect the rotation of boom
 	CameraBoomComponent->bDoCollisionTest = false;
-	CameraBoomComponent->TargetArmLength = 1000.f;
+	CameraBoomComponent->TargetArmLength = 1700.f;
 	CameraBoomComponent->SocketOffset = FVector(0.f, 0.f, 95.f);
 	CameraBoomComponent->RelativeRotation = FRotator(0.f, -90.f, 0.f);
 
@@ -61,8 +61,9 @@ AFlyingFightersPawn::AFlyingFightersPawn()
 	// Plane 
 	Acceleration = 700.f;
 	RollLimit = 23.f;
-	DefaultTurnSpeed = 0.3f;		
-	MaxTurnSpeed = 1.5f;
+	DefaultTurnSpeed = 0.5f;		
+	MaxTurnSpeed = 3.5f;
+	IncreaseTurnSpeed = 1.12f;
 	CurrentTurnSpeed = DefaultTurnSpeed;
 	MaxSpeed = 5000.f;
 	DefaultSpeed = 600.f;
@@ -83,7 +84,7 @@ void AFlyingFightersPawn::SetupPlayerInputComponent(UInputComponent* PlayerInput
 
 	PlayerInputComponent->BindAxis("TurnUp", this, &AFlyingFightersPawn::TurnUpInput);
 	PlayerInputComponent->BindAxis("Accelerate", this, &AFlyingFightersPawn::AccelerateInput);
-	//PlayerInputComponent->BindAction("Fire", IE_Pressed, &AFlyingFightersPawn::FireInput);
+	PlayerInputComponent->BindAction("Fire", IE_Pressed, &AFlyingFightersPawn::FireInput);
 	//PlayerInputComponent->BindAction("Bomb", IE_Pressed, &AFlyingFightersPawn::BombInput);
 	//PlayerInputComponent->BindAction("Special", IE_Pressed, &AFlyingFightersPawn::SpecialInput);
 }
@@ -116,18 +117,16 @@ void AFlyingFightersPawn::TurnUpInput(float Value){
 	if (Value != 0.f){		
 		FVector CurrentLocation = GetActorLocation();		
 		
-		if (CurrentLocation.Z >= HeightMinLimit && CurrentLocation.Z <= HeightMaxLimit){
-			CurrentLocation.Z = CurrentLocation.Z + (CurrentTurnSpeed * Value * 1.1f);
-			if(CurrentLocation.Z >= HeightMinLimit){
-				CurrentLocation.Z = HeightMinLimit + 1.f;
-			}
-			if(CurrentLocation.Z <= HeightMaxLimit){
-				CurrentLocation.Z = HeightMaxLimit - 1.f;
-			}
+		bool bGoingUpOrDown = (Value > 0.f)? true : false;
+
+		if (CurrentLocation.Z >= HeightMinLimit && !bGoingUpOrDown || 
+			CurrentLocation.Z <= HeightMaxLimit && bGoingUpOrDown){
+
+			CurrentLocation.Z = CurrentLocation.Z + (CurrentTurnSpeed * Value);
 			SetActorLocation(CurrentLocation);
 			
 			FRotator CurrentRotation = GetActorRotation();
-			float NewRollValue = CurrentRotation.Roll + (CurrentTurnSpeed * Value * -1.f); // *-1 is needed to make more sense between rotation and direction
+			float NewRollValue = CurrentRotation.Roll + (CurrentTurnSpeed * 0.3f * Value * -1.f); // *-1 is needed to make more sense between rotation and direction
 			
 			if (NewRollValue < 0.f){
 					NewRollValue += 360.f;
@@ -136,14 +135,22 @@ void AFlyingFightersPawn::TurnUpInput(float Value){
 				SetActorRotation(FRotator(0.f, 0.f, NewRollValue));
 			}
 			
-			float NewTurnSpeed = CurrentTurnSpeed * 1.035f;
+			float NewTurnSpeed = CurrentTurnSpeed * IncreaseTurnSpeed;
 			if (NewTurnSpeed >= DefaultTurnSpeed && NewTurnSpeed <= MaxTurnSpeed){
 				CurrentTurnSpeed = NewTurnSpeed;
 			}
 		}
 	} else{
 		CurrentTurnSpeed = DefaultTurnSpeed;
-		SetActorRotation(FRotator(0.f, 0.f, 0.f));
+		FRotator CurrentRollPosition = GetActorRotation();
+		if (CurrentRollPosition.Roll != 0.f){
+			CurrentRollPosition.Roll *= 0.65f;
+			if (FMath::IsNearlyZero(CurrentRollPosition.Roll)){
+				CurrentRollPosition.Roll = 0.f;
+			}				
+			SetActorRotation(CurrentRollPosition);
+		}
+		
 	}		
 }
 
