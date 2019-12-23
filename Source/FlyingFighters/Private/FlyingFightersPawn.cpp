@@ -1,7 +1,7 @@
 // Copyright 2010-2019 Married Games. All Rights Reserved.
 
-#include "FlyingFighters/Public/FlyingFightersPawn.h"
-#include "FlyingFighters/Public/FlyingFightersDefaultProjectile.h"
+#include "FlyingFightersPawn.h"
+#include "FlyingFightersDefaultProjectile.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
@@ -11,6 +11,7 @@
 #include "Engine/CollisionProfile.h"
 #include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "Sound/SoundBase.h"
 
 const FName AFlyingFightersPawn::FireRightBinding("FireRight");
@@ -18,7 +19,10 @@ const FName AFlyingFightersPawn::FireRightBinding("FireRight");
 // Sets default values
 AFlyingFightersPawn::AFlyingFightersPawn()
 {
- 	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = true;
+
+	// Set this pawn to be controlled by the lowest-numbered player
+	AutoPossessPlayer = EAutoReceiveInput::Player0;
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> ShipMesh(TEXT("/Game/Meshes/SM_StarSparrow09.SM_StarSparrow09"));
 
@@ -50,9 +54,16 @@ AFlyingFightersPawn::AFlyingFightersPawn()
 	 * are set in the derived blueprint asset named "BP_Player", not here!!!
 	 ***/
 	
-	// Ship 
+	// Map
+	HeightMaxLimit = 450.f;
+	HeightMinLimit = 40.f;
+
+	// Plane 
 	Acceleration = 700.f;
-	TurnSpeed = 50.f;
+	RollLimit = 23.f;
+	DefaultTurnSpeed = 0.3f;		
+	MaxTurnSpeed = 1.5f;
+	CurrentTurnSpeed = DefaultTurnSpeed;
 	MaxSpeed = 5000.f;
 	DefaultSpeed = 600.f;
 	MinSpeed = 300.f;
@@ -72,9 +83,9 @@ void AFlyingFightersPawn::SetupPlayerInputComponent(UInputComponent* PlayerInput
 
 	PlayerInputComponent->BindAxis("TurnUp", this, &AFlyingFightersPawn::TurnUpInput);
 	PlayerInputComponent->BindAxis("Accelerate", this, &AFlyingFightersPawn::AccelerateInput);
-	//PlayerInputComponent->BindAction("Fire", this, &AFlyingFightersPawn::FireInput);
-	//PlayerInputComponent->BindAction("Bomb", this, &AFlyingFightersPawn::BombInput);
-	//PlayerInputComponent->BindAction("Special", this, &AFlyingFightersPawn::SpecialInput);
+	//PlayerInputComponent->BindAction("Fire", IE_Pressed, &AFlyingFightersPawn::FireInput);
+	//PlayerInputComponent->BindAction("Bomb", IE_Pressed, &AFlyingFightersPawn::BombInput);
+	//PlayerInputComponent->BindAction("Special", IE_Pressed, &AFlyingFightersPawn::SpecialInput);
 }
 
 void AFlyingFightersPawn::Tick(float DeltaSeconds){
@@ -82,7 +93,7 @@ void AFlyingFightersPawn::Tick(float DeltaSeconds){
 
 	// this keep ship moving
 	const FVector LocalMove = FVector(CurrentForwardSpeed * DeltaSeconds, 0.f, 0.f);
-	AddActorLocalOffset(LocalMove, true); 
+	//AddActorLocalOffset(LocalMove, true); 
 }
 
 void AFlyingFightersPawn::NotifyHit(class UPrimitiveComponent* MyComp, class AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit){
@@ -92,9 +103,9 @@ void AFlyingFightersPawn::NotifyHit(class UPrimitiveComponent* MyComp, class AAc
 }
 
 void AFlyingFightersPawn::AccelerateInput(float Value){
-	bool bHasInput = !FMath::IsNearlyEqual(Value, 0.f);
-
-	float CurrentAcceleration = bHasInput ? (Value * Acceleration) : (-0.5f * Acceleration);
+	float CurrentAcceleration = !FMath::IsNearlyEqual(Value, 0.f) ? 
+		(Value * Acceleration) : 
+		(-0.5f * Acceleration);
 
 	float NewForwardSpeed = CurrentForwardSpeed + (GetWorld()->GetDeltaSeconds() * CurrentAcceleration);
 	CurrentForwardSpeed = FMath::Clamp(NewForwardSpeed, DefaultSpeed, MaxSpeed);	
@@ -102,14 +113,38 @@ void AFlyingFightersPawn::AccelerateInput(float Value){
 }
 
 void AFlyingFightersPawn::TurnUpInput(float Value){
-	float TargetHeight = (Value * TurnSpeed);
-	TargetHeight += (FMath::Abs(CurrentHeight) * -0.2f);	
-	FVector CurrentLocation = GetActorLocation();
-	CurrentHeight = CurrentLocation.Z;
-	CurrentLocation.Z += FMath::FInterpTo(CurrentHeight, TargetHeight, GetWorld()->GetDeltaSeconds(), 2.f);			
-	SetActorLocation(CurrentLocation);
-	//TODO: make mesh component rotate on X axis by 16 degrees while is turning
-
+	if (Value != 0.f){		
+		FVector CurrentLocation = GetActorLocation();		
+		
+		if (CurrentLocation.Z >= HeightMinLimit && CurrentLocation.Z <= HeightMaxLimit){
+			CurrentLocation.Z = CurrentLocation.Z + (CurrentTurnSpeed * Value * 1.1f);
+			if(CurrentLocation.Z >= HeightMinLimit){
+				CurrentLocation.Z = HeightMinLimit + 1.f;
+			}
+			if(CurrentLocation.Z <= HeightMaxLimit){
+				CurrentLocation.Z = HeightMaxLimit - 1.f;
+			}
+			SetActorLocation(CurrentLocation);
+			
+			FRotator CurrentRotation = GetActorRotation();
+			float NewRollValue = CurrentRotation.Roll + (CurrentTurnSpeed * Value * -1.f); // *-1 is needed to make more sense between rotation and direction
+			
+			if (NewRollValue < 0.f){
+					NewRollValue += 360.f;
+			}
+			if (NewRollValue <=  RollLimit || NewRollValue >= 360.0f - RollLimit){								
+				SetActorRotation(FRotator(0.f, 0.f, NewRollValue));
+			}
+			
+			float NewTurnSpeed = CurrentTurnSpeed * 1.035f;
+			if (NewTurnSpeed >= DefaultTurnSpeed && NewTurnSpeed <= MaxTurnSpeed){
+				CurrentTurnSpeed = NewTurnSpeed;
+			}
+		}
+	} else{
+		CurrentTurnSpeed = DefaultTurnSpeed;
+		SetActorRotation(FRotator(0.f, 0.f, 0.f));
+	}		
 }
 
 void AFlyingFightersPawn::FireInput(){

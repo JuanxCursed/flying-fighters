@@ -46,24 +46,37 @@ protected:
 public:	
 	AFlyingFightersPawn();
 
-
+	float HeightMaxLimit;
+	float HeightMinLimit;
+	
 	UPROPERTY(EditAnywhere, Category = Plane)
 	float Acceleration;
 
-	// How quicly pawn can steer (up and down movement)
 	UPROPERTY(EditAnywhere, Category = Plane)
-	float TurnSpeed;
+	float CurrentTurnSpeed;
+	
+	UPROPERTY(EditAnywhere, Category = Plane)
+	float DefaultTurnSpeed;
 
-	UPROPERTY(EditAnywhere, Category = Pitch)
+	UPROPERTY(EditAnywhere, Category = Plane)
+	float IncreaseTurnSpeed;
+
+	UPROPERTY(EditAnywhere, Category = Plane)
+	float MaxTurnSpeed;
+	
+	UPROPERTY(EditAnywhere, Category = Plane)
+	float RollLimit;
+
+	UPROPERTY(EditAnywhere, Category = Plane)
 	float MaxSpeed;
 	
-	UPROPERTY(EditAnywhere, Category = Pitch)
+	UPROPERTY(EditAnywhere, Category = Plane)
 	float DefaultSpeed;	
 
-	UPROPERTY(EditAnywhere, Category = Yaw)
+	UPROPERTY(EditAnywhere, Category = Plane)
 	float MinSpeed;
 
-	/** Offset from the ships location to spawn projectiles */
+	/** Offset from the Plane location to spawn projectiles */
 	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite )
 	FVector GunOffset;
 	
