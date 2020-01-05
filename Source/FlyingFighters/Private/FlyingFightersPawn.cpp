@@ -23,11 +23,33 @@ AFlyingFightersPawn::AFlyingFightersPawn()
 
 	// Set this pawn to be controlled by the lowest-numbered player
 	AutoPossessPlayer = EAutoReceiveInput::Player0;
+	
+	// Map
+	HeightMaxLimit = 900.f;
+	HeightMinLimit = 110.f;
+
+	// Plane 
+	Acceleration = 700.f;
+	RollLimit = 23.f;
+	DefaultTurnSpeed = 0.5f;		
+	MaxTurnSpeed = 3.5f;
+	IncreaseTurnSpeed = 1.12f;
+	CurrentTurnSpeed = DefaultTurnSpeed;
+	MaxSpeed = 5000.f;
+	DefaultSpeed = 600.f;
+	MinSpeed = 300.f;
+	CurrentForwardSpeed = 500.f;	
+
+	// Weapon
+	GunOffset = FVector(215.f, 0.f, 5.f);
+	FireRate = 0.1f;
+	bCanFire = true;
+	
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> ShipMesh(TEXT("/Game/Meshes/SM_StarSparrow09.SM_StarSparrow09"));
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
-	RootComponent = MeshComponent;
+	//RootComponent = MeshComponent;
 	MeshComponent->RelativeScale3D = FVector(0.37f, 0.37f, 0.37f);
 	MeshComponent->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
 	MeshComponent->SetStaticMesh(ShipMesh.Object);
@@ -46,7 +68,7 @@ AFlyingFightersPawn::AFlyingFightersPawn()
 
 	// Create a camera component and attach to boom component
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComponent"));
-	CameraComponent->SetupAttachment(CameraBoomComponent, USpringArmComponent::SocketName);
+	CameraComponent->SetupAttachment(CameraBoomComponent, USpringArmComponent::SocketName);	
 	CameraComponent->bUsePawnControlRotation = false; // Prevent to rotate camera when player rotate
 
 	/***
@@ -54,26 +76,7 @@ AFlyingFightersPawn::AFlyingFightersPawn()
 	 * are set in the derived blueprint asset named "BP_Player", not here!!!
 	 ***/
 	
-	// Map
-	HeightMaxLimit = 450.f;
-	HeightMinLimit = 40.f;
-
-	// Plane 
-	Acceleration = 700.f;
-	RollLimit = 23.f;
-	DefaultTurnSpeed = 0.5f;		
-	MaxTurnSpeed = 3.5f;
-	IncreaseTurnSpeed = 1.12f;
-	CurrentTurnSpeed = DefaultTurnSpeed;
-	MaxSpeed = 5000.f;
-	DefaultSpeed = 600.f;
-	MinSpeed = 300.f;
-	CurrentForwardSpeed = 500.f;	
-
-	// Weapon
-	GunOffset = FVector(90.f, 0.f, 0.f);
-	FireRate = 0.1f;
-	bCanFire = true;
+	
 }
 
 /***
@@ -84,38 +87,35 @@ void AFlyingFightersPawn::SetupPlayerInputComponent(UInputComponent* PlayerInput
 
 	PlayerInputComponent->BindAxis("TurnUp", this, &AFlyingFightersPawn::TurnUpInput);
 	PlayerInputComponent->BindAxis("Accelerate", this, &AFlyingFightersPawn::AccelerateInput);
-	PlayerInputComponent->BindAction("Fire", IE_Pressed, &AFlyingFightersPawn::FireInput);
+	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AFlyingFightersPawn::FireInput);
 	//PlayerInputComponent->BindAction("Bomb", IE_Pressed, &AFlyingFightersPawn::BombInput);
 	//PlayerInputComponent->BindAction("Special", IE_Pressed, &AFlyingFightersPawn::SpecialInput);
 }
 
 void AFlyingFightersPawn::Tick(float DeltaSeconds){
 	Super::Tick(DeltaSeconds);
-
 	// this keep ship moving
-	const FVector LocalMove = FVector(CurrentForwardSpeed * DeltaSeconds, 0.f, 0.f);
-	//AddActorLocalOffset(LocalMove, true); 
+	AddActorLocalOffset(FVector(CurrentForwardSpeed * DeltaSeconds, 0.f, 0.f), true); 
 }
 
 void AFlyingFightersPawn::NotifyHit(class UPrimitiveComponent* MyComp, class AActor* Other, class UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit){
 	Super::NotifyHit(MyComp, Other, OtherComp, bSelfMoved, HitLocation, HitNormal, NormalImpulse, Hit);
-
 	// TODO: set game over here when ship is crashed
+	UE_LOG(LogTemp, Warning, TEXT("Hit something"));
 }
 
 void AFlyingFightersPawn::AccelerateInput(float Value){
 	float CurrentAcceleration = !FMath::IsNearlyEqual(Value, 0.f) ? 
 		(Value * Acceleration) : 
-		(-0.5f * Acceleration);
+		(-0.3f * Acceleration);
 
 	float NewForwardSpeed = CurrentForwardSpeed + (GetWorld()->GetDeltaSeconds() * CurrentAcceleration);
-	CurrentForwardSpeed = FMath::Clamp(NewForwardSpeed, DefaultSpeed, MaxSpeed);	
-	AddMovementInput(GetActorRightVector() * CurrentForwardSpeed);
+	MeshComponent->AddActorLocalOffset(GetActorRightVector() * FMath::Clamp(NewForwardSpeed, DefaultSpeed, MaxSpeed));//AddMovementInput
 }
 
-void AFlyingFightersPawn::TurnUpInput(float Value){
+void AFlyingFightersPawn::TurnUpInput(float Value){	
 	if (Value != 0.f){		
-		FVector CurrentLocation = GetActorLocation();		
+		FVector CurrentLocation = MeshComponent->GetActorLocation();		
 		
 		bool bGoingUpOrDown = (Value > 0.f)? true : false;
 
@@ -123,16 +123,16 @@ void AFlyingFightersPawn::TurnUpInput(float Value){
 			CurrentLocation.Z <= HeightMaxLimit && bGoingUpOrDown){
 
 			CurrentLocation.Z = CurrentLocation.Z + (CurrentTurnSpeed * Value);
-			SetActorLocation(CurrentLocation);
+			MeshComponent->SetActorLocation(CurrentLocation);
 			
-			FRotator CurrentRotation = GetActorRotation();
+			FRotator CurrentRotation = MeshComponent->GetActorRotation();
 			float NewRollValue = CurrentRotation.Roll + (CurrentTurnSpeed * 0.3f * Value * -1.f); // *-1 is needed to make more sense between rotation and direction
 			
 			if (NewRollValue < 0.f){
 					NewRollValue += 360.f;
 			}
 			if (NewRollValue <=  RollLimit || NewRollValue >= 360.0f - RollLimit){								
-				SetActorRotation(FRotator(0.f, 0.f, NewRollValue));
+				MeshComponent->SetActorRotation(FRotator(0.f, 0.f, NewRollValue));
 			}
 			
 			float NewTurnSpeed = CurrentTurnSpeed * IncreaseTurnSpeed;
@@ -148,9 +148,8 @@ void AFlyingFightersPawn::TurnUpInput(float Value){
 			if (FMath::IsNearlyZero(CurrentRollPosition.Roll)){
 				CurrentRollPosition.Roll = 0.f;
 			}				
-			SetActorRotation(CurrentRollPosition);
-		}
-		
+			MeshComponent->SetActorRotation(CurrentRollPosition);
+		}		
 	}		
 }
 
@@ -158,7 +157,7 @@ void AFlyingFightersPawn::FireInput(){
 	if (bCanFire == true){
 		UWorld* const World = GetWorld();
 		if (World != nullptr){
-			World->SpawnActor<AFlyingFightersDefaultProjectile>(GetActorLocation(), FRotator(0.f, 0.f, 0.f));
+			World->SpawnActor<AFlyingFightersDefaultProjectile>(GetActorLocation() + GunOffset, FRotator::ZeroRotator);
 		}
 
 		bCanFire = false; 

@@ -35,7 +35,8 @@ AFlyingFightersDefaultProjectile::AFlyingFightersDefaultProjectile()
 void AFlyingFightersDefaultProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit){
 	if(OtherActor != nullptr && OtherActor != this && OtherComp->IsSimulatingPhysics()){
 		//TODO: register damage to actor
+		// TODO: maybe add a particle effect before destroy? or on otheracter to "demonstrate damage"
+		// TODO: emmit sound when hit enemy or destructibles
+		Destroy();
 	}
-	// TODO: maybe add a particle effect before destroy? or on otheracter to "demonstrate damage"
-	Destroy();
 }

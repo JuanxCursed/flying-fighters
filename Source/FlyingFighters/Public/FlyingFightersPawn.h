@@ -31,6 +31,7 @@ private:
 	FTimerHandle TimerHandle_ShotTimerExpired;
 
 protected:	
+	UFUNCTION()
 	void AccelerateInput(float Value);
 	
 	void TurnUpInput(float Value);
@@ -48,7 +49,7 @@ public:
 
 	float HeightMaxLimit;
 	float HeightMinLimit;
-	
+		
 	UPROPERTY(EditAnywhere, Category = Plane)
 	float Acceleration;
 
@@ -77,16 +78,15 @@ public:
 	float MinSpeed;
 
 	/** Offset from the Plane location to spawn projectiles */
-	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite )
+	UPROPERTY(Category = Plane, EditAnywhere, BlueprintReadWrite, Meta = (MakeEditWidget = true) )
 	FVector GunOffset;
 	
 	/* How fast the weapon will fire */
-	UPROPERTY(EditAnywhere, Category = Gameplay)
+	UPROPERTY(EditAnywhere, Category = Plane)
 	float FireRate;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Audio)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Plane)
 	class USoundBase* FireSound;
-	
 
 	/*** APawn interface ***/
 	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
